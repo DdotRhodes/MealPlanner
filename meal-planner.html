@@ -99,6 +99,7 @@ header span{font-size:.85rem;opacity:.8}
 .tag.sf{background:#e3f2fd}
 .tag.src-vp{background:#f3e5f5;color:#7b1fa2}
 .tag.src-tvg{background:#fff3e0;color:#e65100}
+.tag.src-web{background:#e3f2fd;color:#1565c0}
 .recipe-item .ri-pdf{flex-shrink:0;text-decoration:none;color:var(--green);font-size:.75rem;padding:4px 8px;border-radius:5px;border:1px solid var(--border)}
 .recipe-item .ri-pdf:hover{background:var(--green-pale);border-color:var(--green)}
 
@@ -149,6 +150,10 @@ header span{font-size:.85rem;opacity:.8}
 .result-preview{background:var(--green-pale);border-radius:8px;padding:12px;margin-bottom:14px;font-size:.85rem;display:none;line-height:1.7}
 .result-preview.show{display:block}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* Toast notification */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
 
 /* Print */
 @media print{
@@ -253,6 +258,7 @@ header span{font-size:.85rem;opacity:.8}
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openAutoSuggest()">Auto-Suggest Meals</button>
     <button class="btn btn-secondary" onclick="clearPlan()">Clear Plan</button>
+    <button class="btn btn-secondary" onclick="sharePlan()">Share Plan</button>
     <button class="btn btn-secondary" onclick="window.print()">Print</button>
     <div style="margin-left:auto;font-size:.82rem;color:var(--muted)">Click any meal slot to browse recipes</div>
   </div>
@@ -340,6 +346,7 @@ header span{font-size:.85rem;opacity:.8}
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
 <script src="recipes-data.js"></script>
 <script>
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -352,7 +359,7 @@ const MEAL_SLOTS = [
 ];
 
 const ALL_CATS = ['All','Breakfast','Lunch','Dinner','Snack','Dessert','Smoothie','Side','Sauce'];
-const SOURCE_FILTERS = ['All Sources','Vegan Proteins','The Vegan Gym'];
+const SOURCE_FILTERS = ['All Sources','Vegan Proteins','The Vegan Gym','Web Recipes'];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let plan = JSON.parse(localStorage.getItem('mp-plan') || '{}');
@@ -405,7 +412,8 @@ function renderPlan(){
     if(r){
       html += '<td data-label="Recipe"><div class="recipe-cell" onclick="openPanel(\''+slot.id+'\')">';
       html += '<span class="recipe-name">'+r.name+'</span>';
-      html += '<span class="tag '+(r.source==='TVG'?'src-tvg':'src-vp')+'" style="font-size:.65rem;margin-left:4px">'+(r.source==='TVG'?'TVG':'VP')+'</span>';
+      const _srcCls = r.source==='TVG'?'src-tvg':r.source==='WEB'?'src-web':'src-vp';
+      html += '<span class="tag '+_srcCls+'" style="font-size:.65rem;margin-left:4px">'+r.source+'</span>';
       if(pdfUrl) html += '<a class="pdf-link" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open recipe PDF">PDF</a>';
       html += '<button class="remove-btn" onclick="event.stopPropagation();removeSlot(\''+slot.id+'\')" title="Remove">&times;</button>';
       html += '</div>';
@@ -523,9 +531,13 @@ function buildFilterPills(){
     '<span class="pill'+(c===activeFilter?' active':'')+'" onclick="setFilter(\''+c+'\')">'+c+'</span>'
   ).join('') +
   '<span style="width:100%;height:0"></span>' +
-  SOURCE_FILTERS.map(s =>
-    '<span class="pill'+(s===activeSource?' active':'')+'" style="'+(s==='Vegan Proteins'?'border-color:#7b1fa2;'+(activeSource===s?'background:#7b1fa2;color:#fff':'color:#7b1fa2'):s==='The Vegan Gym'?'border-color:#e65100;'+(activeSource===s?'background:#e65100;color:#fff':'color:#e65100'):'')+'" onclick="setSource(\''+s+'\')">'+s+'</span>'
-  ).join('');
+  SOURCE_FILTERS.map(s => {
+    let style = '';
+    if(s==='Vegan Proteins') style = 'border-color:#7b1fa2;'+(activeSource===s?'background:#7b1fa2;color:#fff':'color:#7b1fa2');
+    else if(s==='The Vegan Gym') style = 'border-color:#e65100;'+(activeSource===s?'background:#e65100;color:#fff':'color:#e65100');
+    else if(s==='Web Recipes') style = 'border-color:#1565c0;'+(activeSource===s?'background:#1565c0;color:#fff':'color:#1565c0');
+    return '<span class="pill'+(s===activeSource?' active':'')+'" style="'+style+'" onclick="setSource(\''+s+'\')">'+s+'</span>';
+  }).join('');
 }
 
 function setFilter(cat){
@@ -550,6 +562,7 @@ function renderPanel(){
     if(activeFilter !== 'All' && !r.cats.includes(activeFilter)) return false;
     if(activeSource === 'Vegan Proteins' && r.source !== 'VP') return false;
     if(activeSource === 'The Vegan Gym' && r.source !== 'TVG') return false;
+    if(activeSource === 'Web Recipes' && r.source !== 'WEB') return false;
     return true;
   });
 
@@ -569,7 +582,7 @@ function renderPanel(){
         '<div class="ri-name">'+r.name+'</div>' +
         '<div class="ri-macros">'+fmtN(r.cal)+' cal &middot; '+fmt(r.prot)+'g P &middot; '+fmt(r.carb)+'g C &middot; '+fmt(r.fat)+'g F</div>' +
         '<div class="ri-tags">' +
-          (r.source==='TVG' ? '<span class="tag src-tvg">TVG</span>' : '<span class="tag src-vp">VP</span>') +
+          (r.source==='TVG' ? '<span class="tag src-tvg">TVG</span>' : r.source==='WEB' ? '<span class="tag src-web">WEB</span>' : '<span class="tag src-vp">VP</span>') +
           r.cats.map(c=>'<span class="tag">'+c+'</span>').join('') +
           (r.gf ? '<span class="tag gf">GF</span>' : '') +
           (r.sf ? '<span class="tag sf">SF</span>' : '') +
@@ -1195,7 +1208,65 @@ function addCustomItem(){
   renderGrocery();
 }
 
+// ── SHARE / LOAD PLAN ────────────────────────────────────────────────────────
+function encodePlan(){
+  // Encode plan + targets + days/people into a compact URL hash
+  const data = {p: plan, t: targets};
+  return btoa(JSON.stringify(data));
+}
+
+function decodePlan(hash){
+  try {
+    const data = JSON.parse(atob(hash));
+    return data;
+  } catch(e){ return null; }
+}
+
+function sharePlan(){
+  const mealsInPlan = MEAL_SLOTS.filter(s => plan[s.id]);
+  if(!mealsInPlan.length){
+    showToast('Add meals to your plan first!');
+    return;
+  }
+  const hash = encodePlan();
+  const url = location.origin + location.pathname + '?plan=' + hash;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Link copied! Share it to load this meal plan.');
+  }).catch(() => {
+    // Fallback for older browsers
+    prompt('Copy this link to share your meal plan:', url);
+  });
+}
+
+function loadSharedPlan(){
+  const params = new URLSearchParams(location.search);
+  const hash = params.get('plan');
+  if(!hash) return false;
+  const data = decodePlan(hash);
+  if(!data || !data.p) return false;
+  plan = data.p;
+  savePlan();
+  if(data.t){
+    targets = data.t;
+    saveTargets();
+  }
+  // Clean URL without reloading
+  history.replaceState(null, '', location.pathname);
+  showToast('Shared meal plan loaded!');
+  return true;
+}
+
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
 // ── INIT ─────────────────────────────────────────────────────────────────────
+// Load shared plan from URL if present
+loadSharedPlan();
+
 // Load instructions
 fetch('instructions_db.json')
   .then(r => r.json())
