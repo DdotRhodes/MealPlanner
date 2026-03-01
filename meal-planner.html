@@ -439,7 +439,7 @@ let currentSlot = null;
 let activeFilter = 'All';
 let activeSource = 'All Sources';
 
-function savePlan(){ localStorage.setItem('mp-plan', JSON.stringify(plan)); }
+function savePlan(){ localStorage.setItem('mp-plan', JSON.stringify(plan)); pushPlanToSync(); }
 function saveChecked(){ localStorage.setItem('mp-checked', JSON.stringify(checkedItems)); }
 function saveCustomItems(){ localStorage.setItem('mp-custom-items', JSON.stringify(customItems)); }
 function saveTargets(){ localStorage.setItem('mp-targets', JSON.stringify(targets)); }
@@ -1476,6 +1476,8 @@ function joinSyncRoom(){
   startSync(code);
 }
 
+let planRef = null;
+
 function startSync(code){
   if(!initFirebase()){
     showFirebaseSetup();
@@ -1486,20 +1488,38 @@ function startSync(code){
 
   const db = firebase.database();
   syncRef = db.ref('rooms/' + syncRoomCode + '/checked');
+  planRef = db.ref('rooms/' + syncRoomCode + '/plan');
 
   // Push current state first
   syncRef.set(checkedItems);
+  // Only push plan if we have one (don't overwrite host's plan with empty)
+  if(Object.keys(plan).length > 0){
+    planRef.set(plan);
+  }
 
-  // Listen for changes (including our own)
+  // Listen for checked-item changes
   syncRef.on('value', (snapshot) => {
     if(syncPaused) return;
     const remote = snapshot.val() || {};
     checkedItems = remote;
     localStorage.setItem('mp-checked', JSON.stringify(checkedItems));
-    // Re-render grocery list without losing sync
     syncPaused = true;
     renderGrocery();
     syncPaused = false;
+  });
+
+  // Listen for plan changes
+  planRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val();
+    if(remote){
+      plan = remote;
+      savePlan();
+      syncPaused = true;
+      renderPlan();
+      renderGrocery();
+      syncPaused = false;
+    }
   });
 
   isSyncing = true;
@@ -1508,10 +1528,8 @@ function startSync(code){
 }
 
 function stopSync(){
-  if(syncRef){
-    syncRef.off();
-    syncRef = null;
-  }
+  if(syncRef){ syncRef.off(); syncRef = null; }
+  if(planRef){ planRef.off(); planRef = null; }
   syncRoomCode = null;
   isSyncing = false;
   localStorage.removeItem('mp-sync-room');
@@ -1523,6 +1541,13 @@ function pushCheckedToSync(){
   if(isSyncing && syncRef && !syncPaused){
     syncPaused = true;
     syncRef.set(checkedItems).then(() => { syncPaused = false; });
+  }
+}
+
+function pushPlanToSync(){
+  if(isSyncing && planRef && !syncPaused){
+    syncPaused = true;
+    planRef.set(plan).then(() => { syncPaused = false; });
   }
 }
 
