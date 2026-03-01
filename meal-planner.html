@@ -255,7 +255,7 @@ header .version{margin-left:auto;font-size:.75rem;opacity:.7}
 <header>
   <h1>Meal Planner</h1>
   <span>Weekly meal prep &middot; Macro tracking &middot; Smart grocery list</span>
-  <span class="version">v1.2</span>
+  <span class="version">v1.3</span>
 </header>
 
 <div class="tabs">
@@ -300,8 +300,8 @@ header .version{margin-left:auto;font-size:.75rem;opacity:.7}
 <!-- GROCERY PAGE -->
 <div class="page" id="page-grocery">
   <div class="grocery-settings">
-    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="renderGrocery()"></label>
-    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="renderGrocery()"></label>
+    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="renderGrocery();renderPlan()"></label>
+    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="renderGrocery();renderPlan()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
     <button class="btn btn-primary btn-sm" id="sync-btn" onclick="openSyncModal()">Live Sync</button>
@@ -420,6 +420,7 @@ header .version{margin-left:auto;font-size:.75rem;opacity:.7}
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const MEAL_SLOTS = [
   {id:'breakfast', label:'Breakfast', cats:['Breakfast','Smoothie']},
+  {id:'shake',     label:'Shake',     cats:['Smoothie','Shake']},
   {id:'lunch',     label:'Lunch',     cats:['Lunch']},
   {id:'snack',     label:'Snack',     cats:['Snack','Smoothie','Side']},
   {id:'dinner',    label:'Dinner',    cats:['Dinner']},
@@ -487,7 +488,8 @@ function renderPlan(){
       html += '</div>';
       // steps toggle
       const steps = instructionsDB[fn];
-      if(steps && steps.length){
+      const hasIngredients = r && r.ingredients && r.ingredients.length;
+      if((steps && steps.length) || hasIngredients){
         html += '<button class="steps-toggle" onclick="toggleSteps(event,\'steps-'+slot.id+'\')">&#9654; Prep steps</button>';
       }
       html += '</td>';
@@ -504,10 +506,11 @@ function renderPlan(){
 
     // Steps row (with ingredients + instructions)
     const steps = fn ? (instructionsDB[fn]||[]) : [];
-    if(steps.length){
+    const hasIng = r && r.ingredients && r.ingredients.length;
+    if(steps.length || hasIng){
       html += '<tr class="steps-row" id="steps-'+slot.id+'"><td></td><td colspan="5">';
       // Ingredients list
-      if(r && r.ingredients && r.ingredients.length){
+      if(hasIng){
         const days = parseInt(document.getElementById('days-per-week').value)||7;
         const people = parseInt(document.getElementById('num-people').value)||1;
         const scale = (days * people) / (r.srv || 1);
@@ -523,9 +526,12 @@ function renderPlan(){
         });
         html += '</ul></div>';
       }
-      html += '<strong style="font-size:.85rem;color:var(--green)">Steps:</strong><ol class="steps-list">';
-      steps.forEach(s => html += '<li>'+s+'</li>');
-      html += '</ol></td></tr>';
+      if(steps.length){
+        html += '<strong style="font-size:.85rem;color:var(--green)">Steps:</strong><ol class="steps-list">';
+        steps.forEach(s => html += '<li>'+s+'</li>');
+        html += '</ol>';
+      }
+      html += '</td></tr>';
     }
   });
 
@@ -597,7 +603,7 @@ function openPanel(slotId){
   const slot = MEAL_SLOTS.find(s => s.id === slotId);
   document.getElementById('panel-title').textContent = 'Choose: ' + slot.label;
   document.getElementById('panel-search').value = '';
-  activeFilter = 'All';
+  activeFilter = slot.cats[0];
   activeSource = 'All Sources';
   buildFilterPills();
   renderPanel();
@@ -1267,6 +1273,7 @@ function toggleCheck(key, checked){
   else delete checkedItems[key];
   saveChecked();
   pushCheckedToSync();
+  renderGrocery();
 }
 
 function uncheckAll(){
