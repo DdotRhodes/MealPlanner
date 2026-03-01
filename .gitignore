@@ -1,3 +1,6 @@
 Meal Plan Recipes.zip
 _*.js
 .claude/
+node_modules/
+package.json
+package-lock.json

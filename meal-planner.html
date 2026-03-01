@@ -190,7 +190,8 @@ header span{font-size:.85rem;opacity:.8}
   .totals-row{display:none}
   .target-row{display:none}
   .diff-row{display:none}
-  .steps-row{display:block!important}
+  .steps-row{display:none}
+  .steps-row.open{display:block}
   .steps-row td{padding:4px 14px}
   .steps-row td:first-child{display:none}
 
@@ -434,10 +435,17 @@ function renderPlan(){
     }
     html += '</tr>';
 
-    // Steps row
+    // Steps row (with ingredients + instructions)
     const steps = fn ? (instructionsDB[fn]||[]) : [];
     if(steps.length){
-      html += '<tr class="steps-row" id="steps-'+slot.id+'"><td></td><td colspan="5"><ol class="steps-list">';
+      html += '<tr class="steps-row" id="steps-'+slot.id+'"><td></td><td colspan="5">';
+      // Ingredients list
+      if(r && r.ingredients && r.ingredients.length){
+        html += '<div style="margin-bottom:10px"><strong style="font-size:.85rem;color:var(--green)">Ingredients:</strong><ul style="margin:4px 0 0 16px;padding:0;font-size:.84rem;line-height:1.6;list-style:disc">';
+        r.ingredients.forEach(ing => html += '<li>'+ing+'</li>');
+        html += '</ul></div>';
+      }
+      html += '<strong style="font-size:.85rem;color:var(--green)">Steps:</strong><ol class="steps-list">';
       steps.forEach(s => html += '<li>'+s+'</li>');
       html += '</ol></td></tr>';
     }
