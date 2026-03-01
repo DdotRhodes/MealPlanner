@@ -1407,8 +1407,8 @@ function parseFirebaseConfig(text){
   cleaned = cleaned.replace(/^(?:const|var|let)\s+\w+\s*=\s*/, '');
   // Strip trailing semicolons
   cleaned = cleaned.replace(/;\s*$/, '');
-  // Try to convert JS object to JSON (unquoted keys)
-  cleaned = cleaned.replace(/(\w+)\s*:/g, '"$1":');
+  // Quote unquoted keys only (word before colon that isn't inside quotes)
+  cleaned = cleaned.replace(/^\s*(\w+)\s*:/gm, '"$1":');
   // Remove trailing commas before }
   cleaned = cleaned.replace(/,\s*}/g, '}');
   try {
