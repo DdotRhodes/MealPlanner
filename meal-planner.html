@@ -300,8 +300,8 @@ header .version{margin-left:auto;font-size:.75rem;opacity:.7}
 <!-- GROCERY PAGE -->
 <div class="page" id="page-grocery">
   <div class="grocery-settings">
-    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="localStorage.setItem('mp-days',this.value);renderGrocery();renderPlan();pushSettingsToSync()"></label>
-    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="localStorage.setItem('mp-people',this.value);renderGrocery();renderPlan();pushSettingsToSync()"></label>
+    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="onSettingsChange()"></label>
+    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="onSettingsChange()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
     <button class="btn btn-primary btn-sm" id="sync-btn" onclick="openSyncModal()">Live Sync</button>
@@ -451,6 +451,22 @@ function fmtN(v){ return v != null ? Math.round(+v) : '–'; }
 
 function getRecipe(fn){ return RECIPES.find(r => r.fn === fn); }
 
+function getSettings(){
+  return {
+    days: parseInt(document.getElementById('days-per-week').value)||7,
+    people: parseInt(document.getElementById('num-people').value)||1
+  };
+}
+
+function onSettingsChange(){
+  const {days, people} = getSettings();
+  localStorage.setItem('mp-days', days);
+  localStorage.setItem('mp-people', people);
+  renderGrocery();
+  renderPlan();
+  pushSettingsToSync();
+}
+
 function getPdfUrl(fn){
   const pdf = RECIPE_PDF_MAP[fn];
   return pdf ? 'recipes/' + encodeURIComponent(pdf) : null;
@@ -468,6 +484,7 @@ function showPage(id){
 // ── MEAL PLAN RENDERING ─────────────────────────────────────────────────────
 function renderPlan(){
   const body = document.getElementById('plan-body');
+  const {days, people} = getSettings();
   let totCal=0, totProt=0, totCarb=0, totFat=0;
   let html = '';
 
@@ -475,6 +492,9 @@ function renderPlan(){
     const fn = plan[slot.id];
     const r = fn ? getRecipe(fn) : null;
     const pdfUrl = fn ? getPdfUrl(fn) : null;
+    const steps = fn ? (instructionsDB[fn]||[]) : [];
+    const hasIng = r && r.ingredients && r.ingredients.length;
+    const showPrep = steps.length || hasIng;
 
     html += '<tr>';
     html += '<td class="meal-label">'+slot.label+'</td>';
@@ -486,10 +506,7 @@ function renderPlan(){
       if(pdfUrl) html += '<a class="pdf-link" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open recipe PDF">PDF</a>';
       html += '<button class="remove-btn" onclick="event.stopPropagation();removeSlot(\''+slot.id+'\')" title="Remove">&times;</button>';
       html += '</div>';
-      // steps toggle
-      const steps = instructionsDB[fn];
-      const hasIngredients = r && r.ingredients && r.ingredients.length;
-      if((steps && steps.length) || hasIngredients){
+      if(showPrep){
         html += '<button class="steps-toggle" onclick="toggleSteps(event,\'steps-'+slot.id+'\')">&#9654; Prep steps</button>';
       }
       html += '</td>';
@@ -505,14 +522,10 @@ function renderPlan(){
     html += '</tr>';
 
     // Steps row (with ingredients + instructions)
-    const steps = fn ? (instructionsDB[fn]||[]) : [];
-    const hasIng = r && r.ingredients && r.ingredients.length;
-    if(steps.length || hasIng){
+    if(showPrep){
       html += '<tr class="steps-row" id="steps-'+slot.id+'"><td></td><td colspan="5">';
       // Ingredients list
       if(hasIng){
-        const days = parseInt(document.getElementById('days-per-week').value)||7;
-        const people = parseInt(document.getElementById('num-people').value)||1;
         const scale = (days * people) / (r.srv || 1);
         html += '<div style="margin-bottom:10px"><strong style="font-size:.85rem;color:var(--green)">Ingredients:</strong><ul style="margin:4px 0 0 16px;padding:0;font-size:.84rem;line-height:1.6;list-style:disc">';
         r.ingredients.forEach(ing => {
@@ -1085,8 +1098,7 @@ function fmtQty(n){
 
 // ── GROCERY LIST ──────────────────────────────────────────────────────────────
 function buildGroceryItems(){
-  const days   = parseInt(document.getElementById('days-per-week').value)||7;
-  const people = parseInt(document.getElementById('num-people').value)||1;
+  const {days, people} = getSettings();
   const map = {};
 
   function addIng(rawText, slotLabel, recipeName, scale){
@@ -1506,10 +1518,7 @@ function startSync(code){
     planRef.set(plan);
   }
   // Push current settings
-  settingsRef.set({
-    days: parseInt(document.getElementById('days-per-week').value)||7,
-    people: parseInt(document.getElementById('num-people').value)||1
-  });
+  settingsRef.set(getSettings());
 
   // Listen for checked-item changes
   syncRef.on('value', (snapshot) => {
@@ -1527,9 +1536,9 @@ function startSync(code){
     if(syncPaused) return;
     const remote = snapshot.val();
     if(remote){
+      syncPaused = true;
       plan = remote;
       savePlan();
-      syncPaused = true;
       renderPlan();
       renderGrocery();
       syncPaused = false;
@@ -1541,13 +1550,13 @@ function startSync(code){
     if(syncPaused) return;
     const remote = snapshot.val();
     if(remote){
-      const daysEl = document.getElementById('days-per-week');
-      const peopleEl = document.getElementById('num-people');
-      if(remote.days) daysEl.value = remote.days;
-      if(remote.people) peopleEl.value = remote.people;
-      localStorage.setItem('mp-days', remote.days||7);
-      localStorage.setItem('mp-people', remote.people||1);
       syncPaused = true;
+      const d = remote.days ?? 7;
+      const p = remote.people ?? 1;
+      document.getElementById('days-per-week').value = d;
+      document.getElementById('num-people').value = p;
+      localStorage.setItem('mp-days', d);
+      localStorage.setItem('mp-people', p);
       renderGrocery();
       renderPlan();
       syncPaused = false;
@@ -1570,29 +1579,15 @@ function stopSync(){
   showToast('Sync stopped');
 }
 
-function pushCheckedToSync(){
-  if(isSyncing && syncRef && !syncPaused){
+function pushToSync(ref, data){
+  if(isSyncing && ref && !syncPaused){
     syncPaused = true;
-    syncRef.set(checkedItems).then(() => { syncPaused = false; });
+    ref.set(data).then(() => { syncPaused = false; });
   }
 }
-
-function pushPlanToSync(){
-  if(isSyncing && planRef && !syncPaused){
-    syncPaused = true;
-    planRef.set(plan).then(() => { syncPaused = false; });
-  }
-}
-
-function pushSettingsToSync(){
-  if(isSyncing && settingsRef && !syncPaused){
-    syncPaused = true;
-    settingsRef.set({
-      days: parseInt(document.getElementById('days-per-week').value)||7,
-      people: parseInt(document.getElementById('num-people').value)||1
-    }).then(() => { syncPaused = false; });
-  }
-}
+function pushCheckedToSync(){ pushToSync(syncRef, checkedItems); }
+function pushPlanToSync(){ pushToSync(planRef, plan); }
+function pushSettingsToSync(){ pushToSync(settingsRef, getSettings()); }
 
 function updateSyncUI(){
   const statusEl = document.getElementById('sync-status');
