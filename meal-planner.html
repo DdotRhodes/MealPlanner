@@ -97,6 +97,8 @@ header span{font-size:.85rem;opacity:.8}
 .tag{font-size:.68rem;padding:1px 7px;border-radius:10px;background:var(--green-pale);color:var(--green);font-weight:600}
 .tag.gf{background:#e8f5e9}
 .tag.sf{background:#e3f2fd}
+.tag.src-vp{background:#f3e5f5;color:#7b1fa2}
+.tag.src-tvg{background:#fff3e0;color:#e65100}
 .recipe-item .ri-pdf{flex-shrink:0;text-decoration:none;color:var(--green);font-size:.75rem;padding:4px 8px;border-radius:5px;border:1px solid var(--border)}
 .recipe-item .ri-pdf:hover{background:var(--green-pale);border-color:var(--green)}
 
@@ -350,6 +352,7 @@ const MEAL_SLOTS = [
 ];
 
 const ALL_CATS = ['All','Breakfast','Lunch','Dinner','Snack','Dessert','Smoothie','Side','Sauce'];
+const SOURCE_FILTERS = ['All Sources','Vegan Proteins','The Vegan Gym'];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let plan = JSON.parse(localStorage.getItem('mp-plan') || '{}');
@@ -359,6 +362,7 @@ let targets = JSON.parse(localStorage.getItem('mp-targets') || '{"cal":1800,"pro
 let instructionsDB = {};
 let currentSlot = null;
 let activeFilter = 'All';
+let activeSource = 'All Sources';
 
 function savePlan(){ localStorage.setItem('mp-plan', JSON.stringify(plan)); }
 function saveChecked(){ localStorage.setItem('mp-checked', JSON.stringify(checkedItems)); }
@@ -401,6 +405,7 @@ function renderPlan(){
     if(r){
       html += '<td data-label="Recipe"><div class="recipe-cell" onclick="openPanel(\''+slot.id+'\')">';
       html += '<span class="recipe-name">'+r.name+'</span>';
+      html += '<span class="tag '+(r.source==='TVG'?'src-tvg':'src-vp')+'" style="font-size:.65rem;margin-left:4px">'+(r.source==='TVG'?'TVG':'VP')+'</span>';
       if(pdfUrl) html += '<a class="pdf-link" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open recipe PDF">PDF</a>';
       html += '<button class="remove-btn" onclick="event.stopPropagation();removeSlot(\''+slot.id+'\')" title="Remove">&times;</button>';
       html += '</div>';
@@ -499,6 +504,7 @@ function openPanel(slotId){
   document.getElementById('panel-title').textContent = 'Choose: ' + slot.label;
   document.getElementById('panel-search').value = '';
   activeFilter = 'All';
+  activeSource = 'All Sources';
   buildFilterPills();
   renderPanel();
   document.getElementById('panel-overlay').classList.add('open');
@@ -515,11 +521,21 @@ function buildFilterPills(){
   const cont = document.getElementById('panel-filters');
   cont.innerHTML = ALL_CATS.map(c =>
     '<span class="pill'+(c===activeFilter?' active':'')+'" onclick="setFilter(\''+c+'\')">'+c+'</span>'
+  ).join('') +
+  '<span style="width:100%;height:0"></span>' +
+  SOURCE_FILTERS.map(s =>
+    '<span class="pill'+(s===activeSource?' active':'')+'" style="'+(s==='Vegan Proteins'?'border-color:#7b1fa2;'+(activeSource===s?'background:#7b1fa2;color:#fff':'color:#7b1fa2'):s==='The Vegan Gym'?'border-color:#e65100;'+(activeSource===s?'background:#e65100;color:#fff':'color:#e65100'):'')+'" onclick="setSource(\''+s+'\')">'+s+'</span>'
   ).join('');
 }
 
 function setFilter(cat){
   activeFilter = cat;
+  buildFilterPills();
+  renderPanel();
+}
+
+function setSource(src){
+  activeSource = src;
   buildFilterPills();
   renderPanel();
 }
@@ -532,6 +548,8 @@ function renderPanel(){
   let filtered = RECIPES.filter(r => {
     if(search && !r.name.toLowerCase().includes(search)) return false;
     if(activeFilter !== 'All' && !r.cats.includes(activeFilter)) return false;
+    if(activeSource === 'Vegan Proteins' && r.source !== 'VP') return false;
+    if(activeSource === 'The Vegan Gym' && r.source !== 'TVG') return false;
     return true;
   });
 
@@ -551,6 +569,7 @@ function renderPanel(){
         '<div class="ri-name">'+r.name+'</div>' +
         '<div class="ri-macros">'+fmtN(r.cal)+' cal &middot; '+fmt(r.prot)+'g P &middot; '+fmt(r.carb)+'g C &middot; '+fmt(r.fat)+'g F</div>' +
         '<div class="ri-tags">' +
+          (r.source==='TVG' ? '<span class="tag src-tvg">TVG</span>' : '<span class="tag src-vp">VP</span>') +
           r.cats.map(c=>'<span class="tag">'+c+'</span>').join('') +
           (r.gf ? '<span class="tag gf">GF</span>' : '') +
           (r.sf ? '<span class="tag sf">SF</span>' : '') +
