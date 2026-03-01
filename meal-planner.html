@@ -300,8 +300,8 @@ header .version{margin-left:auto;font-size:.75rem;opacity:.7}
 <!-- GROCERY PAGE -->
 <div class="page" id="page-grocery">
   <div class="grocery-settings">
-    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="renderGrocery();renderPlan()"></label>
-    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="renderGrocery();renderPlan()"></label>
+    <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="localStorage.setItem('mp-days',this.value);renderGrocery();renderPlan();pushSettingsToSync()"></label>
+    <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="localStorage.setItem('mp-people',this.value);renderGrocery();renderPlan();pushSettingsToSync()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
     <button class="btn btn-primary btn-sm" id="sync-btn" onclick="openSyncModal()">Live Sync</button>
@@ -1484,6 +1484,7 @@ function joinSyncRoom(){
 }
 
 let planRef = null;
+let settingsRef = null;
 
 function startSync(code){
   if(!initFirebase()){
@@ -1496,6 +1497,7 @@ function startSync(code){
   const db = firebase.database();
   syncRef = db.ref('rooms/' + syncRoomCode + '/checked');
   planRef = db.ref('rooms/' + syncRoomCode + '/plan');
+  settingsRef = db.ref('rooms/' + syncRoomCode + '/settings');
 
   // Push current state first
   syncRef.set(checkedItems);
@@ -1503,6 +1505,11 @@ function startSync(code){
   if(Object.keys(plan).length > 0){
     planRef.set(plan);
   }
+  // Push current settings
+  settingsRef.set({
+    days: parseInt(document.getElementById('days-per-week').value)||7,
+    people: parseInt(document.getElementById('num-people').value)||1
+  });
 
   // Listen for checked-item changes
   syncRef.on('value', (snapshot) => {
@@ -1529,6 +1536,24 @@ function startSync(code){
     }
   });
 
+  // Listen for settings changes (days/people)
+  settingsRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val();
+    if(remote){
+      const daysEl = document.getElementById('days-per-week');
+      const peopleEl = document.getElementById('num-people');
+      if(remote.days) daysEl.value = remote.days;
+      if(remote.people) peopleEl.value = remote.people;
+      localStorage.setItem('mp-days', remote.days||7);
+      localStorage.setItem('mp-people', remote.people||1);
+      syncPaused = true;
+      renderGrocery();
+      renderPlan();
+      syncPaused = false;
+    }
+  });
+
   isSyncing = true;
   updateSyncUI();
   showToast('Syncing! Room code: ' + syncRoomCode);
@@ -1537,6 +1562,7 @@ function startSync(code){
 function stopSync(){
   if(syncRef){ syncRef.off(); syncRef = null; }
   if(planRef){ planRef.off(); planRef = null; }
+  if(settingsRef){ settingsRef.off(); settingsRef = null; }
   syncRoomCode = null;
   isSyncing = false;
   localStorage.removeItem('mp-sync-room');
@@ -1555,6 +1581,16 @@ function pushPlanToSync(){
   if(isSyncing && planRef && !syncPaused){
     syncPaused = true;
     planRef.set(plan).then(() => { syncPaused = false; });
+  }
+}
+
+function pushSettingsToSync(){
+  if(isSyncing && settingsRef && !syncPaused){
+    syncPaused = true;
+    settingsRef.set({
+      days: parseInt(document.getElementById('days-per-week').value)||7,
+      people: parseInt(document.getElementById('num-people').value)||1
+    }).then(() => { syncPaused = false; });
   }
 }
 
@@ -1581,6 +1617,14 @@ function updateSyncUI(){
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
+// Restore saved days/people settings
+(function(){
+  const savedDays = localStorage.getItem('mp-days');
+  const savedPeople = localStorage.getItem('mp-people');
+  if(savedDays) document.getElementById('days-per-week').value = savedDays;
+  if(savedPeople) document.getElementById('num-people').value = savedPeople;
+})();
+
 // Load shared plan from URL if present
 loadSharedPlan();
 
