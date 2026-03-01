@@ -155,6 +155,13 @@ header span{font-size:.85rem;opacity:.8}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 
+/* Sync UI */
+.sync-bar{background:var(--green-pale);border:1.5px solid var(--green-light);border-radius:var(--radius);padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sync-bar .sync-dot{width:10px;height:10px;border-radius:50%;background:#4caf50;flex-shrink:0;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-bar .sync-code{font-family:monospace;font-size:1.2rem;font-weight:700;letter-spacing:3px;color:var(--green)}
+.sync-bar .sync-label{font-size:.85rem;color:var(--green);font-weight:600}
+
 /* Print */
 @media print{
   .tabs,.toolbar,.panel-overlay,.modal-overlay,.remove-btn,.btn,.pdf-link,.add-ing-form,.grocery-settings .btn{display:none!important}
@@ -295,7 +302,9 @@ header span{font-size:.85rem;opacity:.8}
     <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="renderGrocery()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
+    <button class="btn btn-primary btn-sm" id="sync-btn" onclick="openSyncModal()">Live Sync</button>
   </div>
+  <div id="sync-status"></div>
   <div id="grocery-content"></div>
   <div class="add-ing-form">
     <input type="text" id="custom-ing-input" placeholder="Add custom item (e.g. 2 cups almond milk)">
@@ -348,6 +357,62 @@ header span{font-size:.85rem;opacity:.8}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Sync Room Modal -->
+<div class="modal-overlay" id="sync-modal">
+  <div class="modal" style="width:420px">
+    <h2>Live Grocery Sync</h2>
+    <p style="font-size:.88rem;color:var(--muted);margin-bottom:16px">Sync your grocery checklist in real-time. Both you and your shopping partner will see items checked off instantly.</p>
+    <div id="sync-modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button class="btn btn-primary" onclick="createSyncRoom()" style="width:100%;padding:12px">Create New Room</button>
+        <div style="text-align:center;color:var(--muted);font-size:.85rem">— or join an existing room —</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="join-code-input" placeholder="Enter room code" maxlength="6" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:1.1rem;text-align:center;letter-spacing:3px;text-transform:uppercase;font-weight:700">
+          <button class="btn btn-primary" onclick="joinSyncRoom()">Join</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn btn-secondary btn-sm" onclick="closeSyncModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase Setup Modal -->
+<div class="modal-overlay" id="firebase-modal">
+  <div class="modal" style="width:520px">
+    <h2>One-Time Firebase Setup</h2>
+    <p style="font-size:.88rem;color:var(--muted);margin-bottom:12px">To enable real-time sync, you need a free Firebase project. This only takes 2 minutes:</p>
+    <ol style="font-size:.85rem;line-height:1.8;margin:0 0 16px 18px;color:var(--text)">
+      <li>Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--green);font-weight:600">console.firebase.google.com</a></li>
+      <li>Click <strong>Add project</strong> &rarr; name it anything (e.g. "meal-planner")</li>
+      <li>Disable Google Analytics (not needed) &rarr; click <strong>Create project</strong></li>
+      <li>Click the <strong>web icon &lt;/&gt;</strong> to add a web app &rarr; name it anything &rarr; click <strong>Register app</strong></li>
+      <li>You'll see a <code>firebaseConfig</code> object — copy the entire block</li>
+      <li>In the left sidebar, click <strong>Build &rarr; Realtime Database</strong> &rarr; <strong>Create Database</strong></li>
+      <li>Choose any location &rarr; Start in <strong>test mode</strong> &rarr; click <strong>Enable</strong></li>
+    </ol>
+    <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:6px">Paste your Firebase config here:</label>
+    <textarea id="firebase-config-input" rows="8" style="width:100%;font-family:monospace;font-size:.8rem;padding:10px;border:1.5px solid var(--border);border-radius:8px;resize:vertical" placeholder='const firebaseConfig = {
+  apiKey: "AIza...",
+  authDomain: "your-app.firebaseapp.com",
+  databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+  projectId: "your-app",
+  storageBucket: "your-app.appspot.com",
+  messagingSenderId: "123456",
+  appId: "1:123456:web:abc123"
+};'></textarea>
+    <div id="firebase-config-error" style="color:#e41c23;font-size:.82rem;margin-top:6px;display:none"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary btn-sm" onclick="closeFirebaseModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFirebaseSetup()">Save & Continue</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="recipes-data.js"></script>
 <script>
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -1188,11 +1253,13 @@ function toggleCheck(key, checked){
   if(checked) checkedItems[key] = true;
   else delete checkedItems[key];
   saveChecked();
+  pushCheckedToSync();
 }
 
 function uncheckAll(){
   checkedItems = {};
   saveChecked();
+  pushCheckedToSync();
   renderGrocery();
 }
 
@@ -1271,6 +1338,198 @@ function showToast(msg){
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ── FIREBASE LIVE SYNC ───────────────────────────────────────────────────────
+let firebaseApp = null;
+let syncRef = null;
+let syncRoomCode = null;
+let isSyncing = false;
+let syncPaused = false; // prevent echo loops
+
+function getFirebaseConfig(){
+  const s = localStorage.getItem('mp-firebase-config');
+  return s ? JSON.parse(s) : null;
+}
+
+function initFirebase(){
+  const config = getFirebaseConfig();
+  if(!config) return false;
+  try {
+    if(!firebaseApp){
+      firebaseApp = firebase.initializeApp(config);
+    }
+    return true;
+  } catch(e){
+    console.error('Firebase init failed:', e);
+    return false;
+  }
+}
+
+function generateRoomCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function openSyncModal(){
+  if(isSyncing){
+    // Already syncing — show disconnect option
+    if(confirm('You are syncing with room ' + syncRoomCode + '. Stop syncing?')){
+      stopSync();
+    }
+    return;
+  }
+  if(!getFirebaseConfig()){
+    showFirebaseSetup();
+    return;
+  }
+  document.getElementById('sync-modal').classList.add('open');
+  document.getElementById('join-code-input').value = '';
+}
+
+function closeSyncModal(){
+  document.getElementById('sync-modal').classList.remove('open');
+}
+
+function showFirebaseSetup(){
+  document.getElementById('firebase-modal').classList.add('open');
+  document.getElementById('firebase-config-error').style.display = 'none';
+}
+
+function closeFirebaseModal(){
+  document.getElementById('firebase-modal').classList.remove('open');
+}
+
+function parseFirebaseConfig(text){
+  // Accept various formats: raw JSON, JS const/var/let declaration, or just the object
+  let cleaned = text.trim();
+  // Strip const/var/let firebaseConfig =
+  cleaned = cleaned.replace(/^(?:const|var|let)\s+\w+\s*=\s*/, '');
+  // Strip trailing semicolons
+  cleaned = cleaned.replace(/;\s*$/, '');
+  // Try to convert JS object to JSON (unquoted keys)
+  cleaned = cleaned.replace(/(\w+)\s*:/g, '"$1":');
+  // Remove trailing commas before }
+  cleaned = cleaned.replace(/,\s*}/g, '}');
+  try {
+    const obj = JSON.parse(cleaned);
+    if(obj.apiKey && obj.projectId && obj.databaseURL) return obj;
+    if(obj.apiKey && obj.projectId) return obj; // databaseURL might not be set
+    return null;
+  } catch(e){
+    return null;
+  }
+}
+
+function saveFirebaseSetup(){
+  const input = document.getElementById('firebase-config-input').value;
+  const errEl = document.getElementById('firebase-config-error');
+  const config = parseFirebaseConfig(input);
+  if(!config){
+    errEl.textContent = 'Could not parse config. Make sure it includes apiKey, projectId, and databaseURL.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if(!config.databaseURL){
+    errEl.textContent = 'Missing databaseURL. Make sure you created a Realtime Database and it shows in your config.';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('mp-firebase-config', JSON.stringify(config));
+  closeFirebaseModal();
+  showToast('Firebase configured! Now create or join a sync room.');
+  openSyncModal();
+}
+
+function createSyncRoom(){
+  closeSyncModal();
+  const code = generateRoomCode();
+  startSync(code);
+}
+
+function joinSyncRoom(){
+  const input = document.getElementById('join-code-input');
+  const code = input.value.trim().toUpperCase();
+  if(!code || code.length < 4){
+    input.style.borderColor = '#e41c23';
+    return;
+  }
+  closeSyncModal();
+  startSync(code);
+}
+
+function startSync(code){
+  if(!initFirebase()){
+    showFirebaseSetup();
+    return;
+  }
+  syncRoomCode = code;
+  localStorage.setItem('mp-sync-room', syncRoomCode);
+
+  const db = firebase.database();
+  syncRef = db.ref('rooms/' + syncRoomCode + '/checked');
+
+  // Push current state first
+  syncRef.set(checkedItems);
+
+  // Listen for changes (including our own)
+  syncRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val() || {};
+    checkedItems = remote;
+    localStorage.setItem('mp-checked', JSON.stringify(checkedItems));
+    // Re-render grocery list without losing sync
+    syncPaused = true;
+    renderGrocery();
+    syncPaused = false;
+  });
+
+  isSyncing = true;
+  updateSyncUI();
+  showToast('Syncing! Room code: ' + syncRoomCode);
+}
+
+function stopSync(){
+  if(syncRef){
+    syncRef.off();
+    syncRef = null;
+  }
+  syncRoomCode = null;
+  isSyncing = false;
+  localStorage.removeItem('mp-sync-room');
+  updateSyncUI();
+  showToast('Sync stopped');
+}
+
+function pushCheckedToSync(){
+  if(isSyncing && syncRef && !syncPaused){
+    syncPaused = true;
+    syncRef.set(checkedItems).then(() => { syncPaused = false; });
+  }
+}
+
+function updateSyncUI(){
+  const statusEl = document.getElementById('sync-status');
+  const syncBtn = document.getElementById('sync-btn');
+  if(isSyncing){
+    syncBtn.textContent = 'Syncing...';
+    syncBtn.style.background = '#4caf50';
+    syncBtn.style.borderColor = '#4caf50';
+    statusEl.innerHTML = '<div class="sync-bar">' +
+      '<span class="sync-dot"></span>' +
+      '<span class="sync-label">Live Sync Active</span>' +
+      '<span class="sync-code">' + syncRoomCode + '</span>' +
+      '<span style="font-size:.8rem;color:var(--muted)">Share this code with your shopping partner</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="stopSync()" style="margin-left:auto">Disconnect</button>' +
+      '</div>';
+  } else {
+    syncBtn.textContent = 'Live Sync';
+    syncBtn.style.background = '';
+    syncBtn.style.borderColor = '';
+    statusEl.innerHTML = '';
+  }
+}
+
 // ── INIT ─────────────────────────────────────────────────────────────────────
 // Load shared plan from URL if present
 loadSharedPlan();
@@ -1286,6 +1545,14 @@ document.getElementById('tgt-cal').value = targets.cal;
 document.getElementById('tgt-prot').value = targets.prot;
 document.getElementById('tgt-carb').value = targets.carb;
 document.getElementById('tgt-fat').value = targets.fat;
+
+// Auto-reconnect sync if previously connected
+(function(){
+  const savedRoom = localStorage.getItem('mp-sync-room');
+  if(savedRoom && getFirebaseConfig()){
+    startSync(savedRoom);
+  }
+})();
 
 renderPlan();
 </script>
