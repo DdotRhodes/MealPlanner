@@ -1358,9 +1358,18 @@ let syncRoomCode = null;
 let isSyncing = false;
 let syncPaused = false; // prevent echo loops
 
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD-bL3hkD7sFqN1grVFQeBmJfN_EOaNTnU",
+  authDomain: "mealplan-d6322.firebaseapp.com",
+  databaseURL: "https://mealplan-d6322-default-rtdb.firebaseio.com",
+  projectId: "mealplan-d6322",
+  storageBucket: "mealplan-d6322.firebasestorage.app",
+  messagingSenderId: "997073298139",
+  appId: "1:997073298139:web:6cb7fcab54e7622a78e2fe"
+};
+
 function getFirebaseConfig(){
-  const s = localStorage.getItem('mp-firebase-config');
-  return s ? JSON.parse(s) : null;
+  return FIREBASE_CONFIG;
 }
 
 function initFirebase(){
@@ -1390,10 +1399,6 @@ function openSyncModal(){
     if(confirm('You are syncing with room ' + syncRoomCode + '. Stop syncing?')){
       stopSync();
     }
-    return;
-  }
-  if(!getFirebaseConfig()){
-    showFirebaseSetup();
     return;
   }
   document.getElementById('sync-modal').classList.add('open');
