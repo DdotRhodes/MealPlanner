@@ -193,9 +193,62 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
 .sync-bar .sync-code{font-family:monospace;font-size:1.2rem;font-weight:700;letter-spacing:3px;color:var(--charcoal)}
 .sync-bar .sync-label{font-size:.85rem;color:var(--charcoal);font-weight:600}
 
+/* Cook Mode */
+.cook-overlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;overflow-y:auto}
+.cook-overlay.open{display:flex;flex-direction:column}
+.cook-header{background:var(--white);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+.cook-header h2{font-family:var(--font-display);font-size:1.3rem;font-weight:600;color:var(--charcoal);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cook-progress{height:4px;background:var(--border-light);border-radius:2px;flex-shrink:0}
+.cook-progress-bar{height:100%;background:var(--gold);border-radius:2px;transition:width .3s ease}
+.cook-body{flex:1;display:flex;max-width:900px;width:100%;margin:0 auto;padding:24px;gap:24px}
+.cook-sidebar{width:260px;flex-shrink:0}
+.cook-sidebar h3{font-family:var(--font-display);font-size:.95rem;font-weight:600;color:var(--charcoal);margin-bottom:10px}
+.cook-ing-list{list-style:none;padding:0;margin:0;font-size:.84rem;line-height:1.7}
+.cook-ing-list li{padding:4px 0;border-bottom:1px solid var(--border-light);color:var(--text)}
+.cook-ing-list li.highlight{background:var(--gold-pale);padding:4px 6px;border-radius:4px;font-weight:600}
+.cook-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.cook-step-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;margin-bottom:8px}
+.cook-step-text{font-size:1.15rem;line-height:1.8;color:var(--text);flex:1}
+.cook-step-text .time-highlight{background:var(--gold-pale);color:var(--gold);font-weight:700;padding:1px 6px;border-radius:4px;cursor:pointer;border-bottom:2px solid var(--gold)}
+.cook-timer{display:none;align-items:center;gap:12px;background:var(--white);border:1.5px solid var(--gold);border-radius:10px;padding:14px 20px;margin-top:16px}
+.cook-timer.active{display:flex}
+.cook-timer-display{font-family:var(--font-display);font-size:2rem;font-weight:700;color:var(--charcoal);min-width:100px;text-align:center}
+.cook-timer-label{font-size:.82rem;color:var(--text-muted)}
+.cook-timer-btns{display:flex;gap:6px}
+.cook-nav{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:20px;flex-shrink:0;padding-top:16px;border-top:1px solid var(--border-light)}
+.cook-nav .step-dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;flex:1}
+.cook-nav .step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);cursor:pointer;transition:all .15s}
+.cook-nav .step-dot.active{background:var(--gold);transform:scale(1.3)}
+.cook-nav .step-dot.done{background:var(--success)}
+.cook-done{text-align:center;padding:40px 20px}
+.cook-done h2{font-family:var(--font-display);font-size:1.6rem;color:var(--charcoal);margin-bottom:12px}
+.cook-done p{color:var(--text-muted);font-size:1rem}
+.cook-btn{padding:9px 18px;border-radius:7px;border:none;cursor:pointer;font-weight:500;font-size:.84rem;transition:all .2s}
+.cook-btn:hover{transform:translateY(-1px)}
+.cook-btn-primary{background:var(--charcoal);color:#fff}
+.cook-btn-primary:hover{background:var(--charcoal-light)}
+.cook-btn-gold{background:var(--gold);color:#fff}
+.cook-btn-gold:hover{background:var(--gold-light)}
+.cook-btn-secondary{background:var(--white);color:var(--charcoal);border:1.5px solid var(--border)}
+.cook-btn-secondary:hover{background:var(--bg);border-color:var(--charcoal)}
+/* Cook mode launch button */
+.cook-launch{text-decoration:none;font-size:.78rem;color:var(--gold);opacity:.7;padding:2px 6px;border-radius:3px;transition:all .15s;cursor:pointer;border:none;background:none;font-weight:600}
+.cook-launch:hover{opacity:1;background:var(--gold-pale)}
+.ri-cook{flex-shrink:0;color:var(--gold);font-size:.75rem;padding:4px 8px;border-radius:5px;border:1px solid var(--gold);transition:all .15s;cursor:pointer;background:none;font-weight:600}
+.ri-cook:hover{background:var(--gold-pale)}
+
+@media(max-width:768px){
+  .cook-body{flex-direction:column;padding:16px}
+  .cook-sidebar{width:100%;order:2}
+  .cook-main{order:1}
+  .cook-step-text{font-size:1.05rem}
+  .cook-header h2{font-size:1.1rem}
+  .cook-timer-display{font-size:1.5rem}
+}
+
 /* Print */
 @media print{
-  .tabs,.toolbar,.panel-overlay,.modal-overlay,.remove-btn,.btn,.pdf-link,.add-ing-form,.grocery-settings .btn{display:none!important}
+  .tabs,.toolbar,.panel-overlay,.modal-overlay,.remove-btn,.btn,.pdf-link,.cook-launch,.cook-overlay,.add-ing-form,.grocery-settings .btn{display:none!important}
   .page{display:block!important;padding:10px}
   body{background:#fff}
   .ing-check{display:none!important}
@@ -391,6 +444,48 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
   </div>
 </div>
 
+<!-- COOK MODE OVERLAY -->
+<div class="cook-overlay" id="cook-overlay">
+  <div class="cook-header">
+    <button class="cook-btn cook-btn-secondary" onclick="closeCookMode()">&larr; Exit</button>
+    <h2 id="cook-title"></h2>
+    <span id="cook-step-counter" style="font-size:.82rem;color:var(--text-muted);white-space:nowrap"></span>
+  </div>
+  <div class="cook-progress"><div class="cook-progress-bar" id="cook-progress-bar"></div></div>
+  <div class="cook-body">
+    <div class="cook-sidebar">
+      <h3>Ingredients</h3>
+      <ul class="cook-ing-list" id="cook-ing-list"></ul>
+    </div>
+    <div class="cook-main">
+      <div id="cook-step-content">
+        <div class="cook-step-label" id="cook-step-label"></div>
+        <div class="cook-step-text" id="cook-step-text"></div>
+        <div class="cook-timer" id="cook-timer">
+          <div>
+            <div class="cook-timer-display" id="cook-timer-display">0:00</div>
+            <div class="cook-timer-label" id="cook-timer-label"></div>
+          </div>
+          <div class="cook-timer-btns">
+            <button class="cook-btn cook-btn-gold" id="cook-timer-btn" onclick="toggleCookTimer()">Start</button>
+            <button class="cook-btn cook-btn-secondary" onclick="resetCookTimer()">Reset</button>
+          </div>
+        </div>
+      </div>
+      <div class="cook-done" id="cook-done" style="display:none">
+        <h2>All done!</h2>
+        <p>Time to plate up and enjoy your meal.</p>
+        <button class="cook-btn cook-btn-gold" style="margin-top:20px;padding:12px 28px;font-size:.95rem" onclick="closeCookMode()">Back to Meal Plan</button>
+      </div>
+      <div class="cook-nav" id="cook-nav">
+        <button class="cook-btn cook-btn-secondary" id="cook-prev" onclick="cookStep(-1)">&larr; Prev</button>
+        <div class="step-dots" id="cook-dots"></div>
+        <button class="cook-btn cook-btn-primary" id="cook-next" onclick="cookStep(1)">Next &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Sync Room Modal -->
@@ -537,6 +632,7 @@ function renderPlan(){
       const _srcCls = r.source==='TVG'?'src-tvg':r.source==='WEB'?'src-web':'src-vp';
       html += '<span class="tag '+_srcCls+'" style="font-size:.65rem;margin-left:4px">'+r.source+'</span>';
       if(pdfUrl) html += '<a class="pdf-link" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open recipe PDF">PDF</a>';
+      if(steps.length) html += '<button class="cook-launch" onclick="event.stopPropagation();openCookMode(\''+fn+'\')" title="Cook mode">Cook</button>';
       html += '<button class="remove-btn" onclick="event.stopPropagation();removeSlot(\''+slot.id+'\')" title="Remove">&times;</button>';
       html += '</div>';
       if(showPrep){
@@ -715,6 +811,8 @@ function renderPanel(){
   list.innerHTML = filtered.map(r => {
     const pdfUrl = getPdfUrl(r.fn);
     const pdfLink = pdfUrl ? '<a class="ri-pdf" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open PDF">PDF</a>' : '';
+    const hasCookSteps = (instructionsDB[r.fn] || []).length > 0;
+    const cookLink = hasCookSteps ? '<button class="ri-cook" onclick="event.stopPropagation();openCookMode(\''+r.fn+'\')" title="Cook mode">Cook</button>' : '';
     return '<div class="recipe-item" onclick="pickRecipe(\''+r.fn+'\')">' +
       '<div class="recipe-item-info">' +
         '<div class="ri-name">'+r.name+'</div>' +
@@ -726,6 +824,7 @@ function renderPanel(){
           (r.sf ? '<span class="tag sf">SF</span>' : '') +
         '</div>' +
       '</div>' +
+      cookLink +
       pdfLink +
     '</div>';
   }).join('');
@@ -1642,6 +1741,195 @@ function updateSyncUI(){
     syncBtn.style.borderColor = '';
     statusEl.innerHTML = '';
   }
+}
+
+// ── COOK MODE ────────────────────────────────────────────────────────────────
+let cookState = { fn: null, steps: [], ingredients: [], currentStep: 0, timerInterval: null, timerSeconds: 0, timerTarget: 0, timerRunning: false };
+
+function openCookMode(fn){
+  const r = getRecipe(fn);
+  if(!r) return;
+  const steps = instructionsDB[fn] || [];
+  if(!steps.length){ showToast('No cooking steps available for this recipe.'); return; }
+  const {days, people} = getSettings();
+  const scale = (days * people) / (r.srv || 1);
+
+  cookState.fn = fn;
+  cookState.steps = steps;
+  cookState.ingredients = (r.ingredients || []).map(ing => {
+    const p = parseIngLine(ing);
+    if(p.qty > 0) return (fmtQty(p.qty * scale)) + (p.unit ? ' ' + p.unit : '') + ' ' + p.name;
+    return ing;
+  });
+  cookState.currentStep = 0;
+  clearCookTimer();
+
+  document.getElementById('cook-title').textContent = r.name;
+  renderCookIngredients();
+  renderCookStep();
+  document.getElementById('cook-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCookMode(){
+  clearCookTimer();
+  document.getElementById('cook-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function renderCookIngredients(){
+  const list = document.getElementById('cook-ing-list');
+  list.innerHTML = cookState.ingredients.map(ing => '<li>' + ing + '</li>').join('');
+}
+
+function highlightIngredients(){
+  const stepText = (cookState.steps[cookState.currentStep] || '').toLowerCase();
+  document.querySelectorAll('#cook-ing-list li').forEach(li => {
+    const ingText = li.textContent.toLowerCase();
+    // Extract the ingredient name (last meaningful word(s))
+    const words = ingText.split(/\s+/).filter(w => w.length > 2);
+    const matched = words.some(w => stepText.includes(w) && !/^\d/.test(w) && !['cup','cups','tbsp','tsp','tablespoon','teaspoon','ounce','ounces','oz','pound','pounds','lb','lbs','inch','the','and','for','with'].includes(w));
+    li.classList.toggle('highlight', matched);
+  });
+}
+
+function renderCookStep(){
+  const {steps, currentStep} = cookState;
+  const total = steps.length;
+  const isDone = currentStep >= total;
+
+  document.getElementById('cook-step-content').style.display = isDone ? 'none' : '';
+  document.getElementById('cook-done').style.display = isDone ? '' : 'none';
+  document.getElementById('cook-nav').style.display = isDone ? 'none' : '';
+
+  // Progress
+  const progress = isDone ? 100 : ((currentStep + 1) / total) * 100;
+  document.getElementById('cook-progress-bar').style.width = progress + '%';
+  document.getElementById('cook-step-counter').textContent = isDone ? 'Complete' : 'Step ' + (currentStep + 1) + ' of ' + total;
+
+  if(isDone) return;
+
+  // Step label & text
+  document.getElementById('cook-step-label').textContent = 'Step ' + (currentStep + 1);
+  const stepText = steps[currentStep];
+  // Highlight time references
+  const timeRegex = /(\d+[-–]\d+\s*(?:minutes?|mins?|hours?|hrs?|seconds?|secs?)|\d+\s*(?:minutes?|mins?|hours?|hrs?|seconds?|secs?))/gi;
+  const highlighted = stepText.replace(timeRegex, (match) => {
+    const secs = parseTimeToSeconds(match);
+    return '<span class="time-highlight" onclick="startCookTimerFromText('+secs+',\''+match.replace(/'/g,"\\'")+'\')">' + match + '</span>';
+  });
+  document.getElementById('cook-step-text').innerHTML = highlighted;
+
+  // Dots
+  const dots = document.getElementById('cook-dots');
+  dots.innerHTML = steps.map((_, i) => '<span class="step-dot'+(i===currentStep?' active':'')+(i<currentStep?' done':'')+'" onclick="goToCookStep('+i+')"></span>').join('');
+
+  // Prev/Next state
+  document.getElementById('cook-prev').disabled = currentStep === 0;
+  document.getElementById('cook-next').textContent = currentStep === total - 1 ? 'Finish' : 'Next →';
+
+  highlightIngredients();
+
+  // Auto-detect timer in step
+  const timeMatch = stepText.match(timeRegex);
+  if(timeMatch && !cookState.timerRunning){
+    const secs = parseTimeToSeconds(timeMatch[0]);
+    if(secs > 0){
+      cookState.timerTarget = secs;
+      cookState.timerSeconds = secs;
+      document.getElementById('cook-timer-display').textContent = formatTimer(secs);
+      document.getElementById('cook-timer-label').textContent = timeMatch[0];
+      document.getElementById('cook-timer').classList.add('active');
+      document.getElementById('cook-timer-btn').textContent = 'Start';
+    } else {
+      document.getElementById('cook-timer').classList.remove('active');
+    }
+  } else if(!cookState.timerRunning) {
+    document.getElementById('cook-timer').classList.remove('active');
+  }
+}
+
+function parseTimeToSeconds(text){
+  // Handle ranges like "10-15 minutes" → use the first number
+  const rangeMatch = text.match(/(\d+)\s*[-–]\s*\d+/);
+  const num = rangeMatch ? parseInt(rangeMatch[1]) : parseInt(text.match(/\d+/)?.[0] || 0);
+  if(/hours?|hrs?/i.test(text)) return num * 3600;
+  if(/seconds?|secs?/i.test(text)) return num;
+  return num * 60; // default minutes
+}
+
+function formatTimer(secs){
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function startCookTimerFromText(secs, label){
+  clearCookTimer();
+  cookState.timerTarget = secs;
+  cookState.timerSeconds = secs;
+  document.getElementById('cook-timer-display').textContent = formatTimer(secs);
+  document.getElementById('cook-timer-label').textContent = label;
+  document.getElementById('cook-timer').classList.add('active');
+  document.getElementById('cook-timer-btn').textContent = 'Start';
+}
+
+function toggleCookTimer(){
+  if(cookState.timerRunning){
+    clearInterval(cookState.timerInterval);
+    cookState.timerRunning = false;
+    document.getElementById('cook-timer-btn').textContent = 'Resume';
+  } else {
+    cookState.timerRunning = true;
+    document.getElementById('cook-timer-btn').textContent = 'Pause';
+    cookState.timerInterval = setInterval(() => {
+      cookState.timerSeconds--;
+      if(cookState.timerSeconds <= 0){
+        cookState.timerSeconds = 0;
+        clearInterval(cookState.timerInterval);
+        cookState.timerRunning = false;
+        document.getElementById('cook-timer-btn').textContent = 'Start';
+        document.getElementById('cook-timer-display').textContent = '0:00';
+        // Alert
+        try { new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAAD/////AP//AAAAAAD//wAA//8BAAAAAAD//wAAAAAAAAAAAAEAAP//AAAAAAEAAP///v8AAAAA').play(); } catch(e){}
+        showToast('Timer done!');
+        return;
+      }
+      document.getElementById('cook-timer-display').textContent = formatTimer(cookState.timerSeconds);
+    }, 1000);
+  }
+}
+
+function resetCookTimer(){
+  clearInterval(cookState.timerInterval);
+  cookState.timerRunning = false;
+  cookState.timerSeconds = cookState.timerTarget;
+  document.getElementById('cook-timer-display').textContent = formatTimer(cookState.timerTarget);
+  document.getElementById('cook-timer-btn').textContent = 'Start';
+}
+
+function clearCookTimer(){
+  clearInterval(cookState.timerInterval);
+  cookState.timerRunning = false;
+  cookState.timerSeconds = 0;
+  cookState.timerTarget = 0;
+  document.getElementById('cook-timer').classList.remove('active');
+}
+
+function cookStep(dir){
+  if(dir === 1 && cookState.currentStep >= cookState.steps.length - 1){
+    cookState.currentStep = cookState.steps.length; // done
+  } else {
+    cookState.currentStep = Math.max(0, Math.min(cookState.steps.length - 1, cookState.currentStep + dir));
+  }
+  if(!cookState.timerRunning) clearCookTimer();
+  renderCookStep();
+}
+
+function goToCookStep(i){
+  cookState.currentStep = i;
+  if(!cookState.timerRunning) clearCookTimer();
+  renderCookStep();
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
