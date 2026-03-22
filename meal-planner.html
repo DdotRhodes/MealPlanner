@@ -390,7 +390,7 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
     <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="onSettingsChange()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
-    <button class="btn btn-primary btn-sm" id="sync-btn" onclick="openSyncModal()">Live Sync</button>
+    <button class="btn btn-primary btn-sm" id="sync-btn" style="cursor:default">Connecting...</button>
   </div>
   <div id="sync-status"></div>
   <div id="grocery-content"></div>
@@ -488,58 +488,6 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
 
 <div class="toast" id="toast"></div>
 
-<!-- Sync Room Modal -->
-<div class="modal-overlay" id="sync-modal">
-  <div class="modal" style="width:420px">
-    <h2>Live Grocery Sync</h2>
-    <p style="font-size:.88rem;color:var(--text-muted);margin-bottom:16px">Sync your grocery checklist in real-time. Both you and your shopping partner will see items checked off instantly.</p>
-    <div id="sync-modal-body">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <button class="btn btn-primary" onclick="createSyncRoom()" style="width:100%;padding:12px">Create New Room</button>
-        <div style="text-align:center;color:var(--text-muted);font-size:.85rem">— or join an existing room —</div>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="join-code-input" placeholder="Enter room code" maxlength="6" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:1.1rem;text-align:center;letter-spacing:3px;text-transform:uppercase;font-weight:700">
-          <button class="btn btn-primary" onclick="joinSyncRoom()">Join</button>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:16px;text-align:right">
-      <button class="btn btn-secondary btn-sm" onclick="closeSyncModal()">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- Firebase Setup Modal -->
-<div class="modal-overlay" id="firebase-modal">
-  <div class="modal" style="width:520px">
-    <h2>One-Time Firebase Setup</h2>
-    <p style="font-size:.88rem;color:var(--text-muted);margin-bottom:12px">To enable real-time sync, you need a free Firebase project. This only takes 2 minutes:</p>
-    <ol style="font-size:.85rem;line-height:1.8;margin:0 0 16px 18px;color:var(--text)">
-      <li>Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold);font-weight:600">console.firebase.google.com</a></li>
-      <li>Click <strong>Add project</strong> &rarr; name it anything (e.g. "meal-planner")</li>
-      <li>Disable Google Analytics (not needed) &rarr; click <strong>Create project</strong></li>
-      <li>Click the <strong>web icon &lt;/&gt;</strong> to add a web app &rarr; name it anything &rarr; click <strong>Register app</strong></li>
-      <li>You'll see a <code>firebaseConfig</code> object — copy the entire block</li>
-      <li>In the left sidebar, click <strong>Build &rarr; Realtime Database</strong> &rarr; <strong>Create Database</strong></li>
-      <li>Choose any location &rarr; Start in <strong>test mode</strong> &rarr; click <strong>Enable</strong></li>
-    </ol>
-    <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:6px">Paste your Firebase config here:</label>
-    <textarea id="firebase-config-input" rows="8" style="width:100%;font-family:monospace;font-size:.8rem;padding:10px;border:1.5px solid var(--border);border-radius:8px;resize:vertical" placeholder='const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "your-app.firebaseapp.com",
-  databaseURL: "https://your-app-default-rtdb.firebaseio.com",
-  projectId: "your-app",
-  storageBucket: "your-app.appspot.com",
-  messagingSenderId: "123456",
-  appId: "1:123456:web:abc123"
-};'></textarea>
-    <div id="firebase-config-error" style="color:var(--error);font-size:.82rem;margin-top:6px;display:none"></div>
-    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn btn-secondary btn-sm" onclick="closeFirebaseModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveFirebaseSetup()">Save & Continue</button>
-    </div>
-  </div>
-</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -1502,12 +1450,14 @@ function showToast(msg){
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── FIREBASE LIVE SYNC ───────────────────────────────────────────────────────
+// ── FIREBASE PERSISTENT SYNC ─────────────────────────────────────────────────
 let firebaseApp = null;
 let syncRef = null;
-let syncRoomCode = null;
+let planRef = null;
+let settingsRef = null;
 let isSyncing = false;
-let syncPaused = false; // prevent echo loops
+let syncPaused = false;
+let initialLoadDone = false;
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyD-bL3hkD7sFqN1grVFQeBmJfN_EOaNTnU",
@@ -1519,17 +1469,10 @@ const FIREBASE_CONFIG = {
   appId: "1:997073298139:web:6cb7fcab54e7622a78e2fe"
 };
 
-function getFirebaseConfig(){
-  return FIREBASE_CONFIG;
-}
-
 function initFirebase(){
-  const config = getFirebaseConfig();
-  if(!config) return false;
+  if(firebaseApp) return true;
   try {
-    if(!firebaseApp){
-      firebaseApp = firebase.initializeApp(config);
-    }
+    firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
     return true;
   } catch(e){
     console.error('Firebase init failed:', e);
@@ -1537,126 +1480,40 @@ function initFirebase(){
   }
 }
 
-function generateRoomCode(){
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for(let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-}
-
-function openSyncModal(){
-  if(isSyncing){
-    // Already syncing — show disconnect option
-    if(confirm('You are syncing with room ' + syncRoomCode + '. Stop syncing?')){
-      stopSync();
-    }
-    return;
-  }
-  document.getElementById('sync-modal').classList.add('open');
-  document.getElementById('join-code-input').value = '';
-}
-
-function closeSyncModal(){
-  document.getElementById('sync-modal').classList.remove('open');
-}
-
-function showFirebaseSetup(){
-  document.getElementById('firebase-modal').classList.add('open');
-  document.getElementById('firebase-config-error').style.display = 'none';
-}
-
-function closeFirebaseModal(){
-  document.getElementById('firebase-modal').classList.remove('open');
-}
-
-function parseFirebaseConfig(text){
-  // Accept various formats: raw JSON, JS const/var/let declaration, or just the object
-  let cleaned = text.trim();
-  // Strip const/var/let firebaseConfig =
-  cleaned = cleaned.replace(/^(?:const|var|let)\s+\w+\s*=\s*/, '');
-  // Strip trailing semicolons
-  cleaned = cleaned.replace(/;\s*$/, '');
-  // Quote unquoted keys only (word before colon that isn't inside quotes)
-  cleaned = cleaned.replace(/^\s*(\w+)\s*:/gm, '"$1":');
-  // Remove trailing commas before }
-  cleaned = cleaned.replace(/,\s*}/g, '}');
-  try {
-    const obj = JSON.parse(cleaned);
-    if(obj.apiKey && obj.projectId && obj.databaseURL) return obj;
-    if(obj.apiKey && obj.projectId) return obj; // databaseURL might not be set
-    return null;
-  } catch(e){
-    return null;
-  }
-}
-
-function saveFirebaseSetup(){
-  const input = document.getElementById('firebase-config-input').value;
-  const errEl = document.getElementById('firebase-config-error');
-  const config = parseFirebaseConfig(input);
-  if(!config){
-    errEl.textContent = 'Could not parse config. Make sure it includes apiKey, projectId, and databaseURL.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if(!config.databaseURL){
-    errEl.textContent = 'Missing databaseURL. Make sure you created a Realtime Database and it shows in your config.';
-    errEl.style.display = 'block';
-    return;
-  }
-  localStorage.setItem('mp-firebase-config', JSON.stringify(config));
-  closeFirebaseModal();
-  showToast('Firebase configured! Now create or join a sync room.');
-  openSyncModal();
-}
-
-function createSyncRoom(){
-  closeSyncModal();
-  const code = generateRoomCode();
-  startSync(code);
-}
-
-function joinSyncRoom(){
-  const input = document.getElementById('join-code-input');
-  const code = input.value.trim().toUpperCase();
-  if(!code || code.length < 4){
-    input.style.borderColor = '#a04040';
-    return;
-  }
-  closeSyncModal();
-  startSync(code);
-}
-
-let planRef = null;
-let settingsRef = null;
-
-function startSync(code){
-  if(!initFirebase()){
-    showFirebaseSetup();
-    return;
-  }
-  syncRoomCode = code;
-  localStorage.setItem('mp-sync-room', syncRoomCode);
+function startSync(){
+  if(isSyncing || !initFirebase()) return;
 
   const db = firebase.database();
-  syncRef = db.ref('rooms/' + syncRoomCode + '/checked');
-  planRef = db.ref('rooms/' + syncRoomCode + '/plan');
-  settingsRef = db.ref('rooms/' + syncRoomCode + '/settings');
+  syncRef = db.ref('shared/checked');
+  planRef = db.ref('shared/plan');
+  settingsRef = db.ref('shared/settings');
 
-  // Push current state first
-  syncRef.set(checkedItems);
-  // Only push plan if we have one (don't overwrite host's plan with empty)
-  if(Object.keys(plan).length > 0){
-    planRef.set(plan);
+  initialLoadDone = false;
+  let loaded = { checked: false, plan: false, settings: false };
+
+  function checkInitDone(){
+    if(loaded.checked && loaded.plan && loaded.settings){
+      initialLoadDone = true;
+      updateSyncUI();
+    }
   }
-  // Push current settings
-  settingsRef.set(getSettings());
 
   // Listen for checked-item changes
   syncRef.on('value', (snapshot) => {
     if(syncPaused) return;
-    const remote = snapshot.val() || {};
-    checkedItems = remote;
+    const remote = snapshot.val();
+    if(!loaded.checked){
+      loaded.checked = true;
+      if(remote === null){
+        syncRef.set(checkedItems);
+      } else {
+        checkedItems = remote;
+        localStorage.setItem('mp-checked', JSON.stringify(checkedItems));
+      }
+      checkInitDone();
+      return;
+    }
+    checkedItems = remote || {};
     localStorage.setItem('mp-checked', JSON.stringify(checkedItems));
     syncPaused = true;
     renderGrocery();
@@ -1667,20 +1524,50 @@ function startSync(code){
   planRef.on('value', (snapshot) => {
     if(syncPaused) return;
     const remote = snapshot.val();
+    if(!loaded.plan){
+      loaded.plan = true;
+      if(remote === null && Object.keys(plan).length > 0){
+        planRef.set(plan);
+      } else if(remote){
+        plan = remote;
+        localStorage.setItem('mp-plan', JSON.stringify(plan));
+      }
+      checkInitDone();
+      syncPaused = true;
+      renderPlan();
+      renderGrocery();
+      syncPaused = false;
+      return;
+    }
     if(remote){
       syncPaused = true;
       plan = remote;
-      savePlan();
+      localStorage.setItem('mp-plan', JSON.stringify(plan));
       renderPlan();
       renderGrocery();
       syncPaused = false;
     }
   });
 
-  // Listen for settings changes (days/people)
+  // Listen for settings changes
   settingsRef.on('value', (snapshot) => {
     if(syncPaused) return;
     const remote = snapshot.val();
+    if(!loaded.settings){
+      loaded.settings = true;
+      if(remote === null){
+        settingsRef.set(getSettings());
+      } else {
+        const d = remote.days ?? 7;
+        const p = remote.people ?? 1;
+        document.getElementById('days-per-week').value = d;
+        document.getElementById('num-people').value = p;
+        localStorage.setItem('mp-days', d);
+        localStorage.setItem('mp-people', p);
+      }
+      checkInitDone();
+      return;
+    }
     if(remote){
       syncPaused = true;
       const d = remote.days ?? 7;
@@ -1697,22 +1584,10 @@ function startSync(code){
 
   isSyncing = true;
   updateSyncUI();
-  showToast('Syncing! Room code: ' + syncRoomCode);
-}
-
-function stopSync(){
-  if(syncRef){ syncRef.off(); syncRef = null; }
-  if(planRef){ planRef.off(); planRef = null; }
-  if(settingsRef){ settingsRef.off(); settingsRef = null; }
-  syncRoomCode = null;
-  isSyncing = false;
-  localStorage.removeItem('mp-sync-room');
-  updateSyncUI();
-  showToast('Sync stopped');
 }
 
 function pushToSync(ref, data){
-  if(isSyncing && ref && !syncPaused){
+  if(isSyncing && ref && !syncPaused && initialLoadDone){
     syncPaused = true;
     ref.set(data).then(() => { syncPaused = false; });
   }
@@ -1722,23 +1597,18 @@ function pushPlanToSync(){ pushToSync(planRef, plan); }
 function pushSettingsToSync(){ pushToSync(settingsRef, getSettings()); }
 
 function updateSyncUI(){
-  const statusEl = document.getElementById('sync-status');
   const syncBtn = document.getElementById('sync-btn');
-  if(isSyncing){
-    syncBtn.textContent = 'Syncing...';
-    syncBtn.style.background = '#7a9e7e';
-    syncBtn.style.borderColor = '#7a9e7e';
-    statusEl.innerHTML = '<div class="sync-bar">' +
-      '<span class="sync-dot"></span>' +
-      '<span class="sync-label">Live Sync Active</span>' +
-      '<span class="sync-code">' + syncRoomCode + '</span>' +
-      '<span style="font-size:.8rem;color:var(--text-muted)">Share this code with your shopping partner</span>' +
-      '<button class="btn btn-secondary btn-sm" onclick="stopSync()" style="margin-left:auto">Disconnect</button>' +
-      '</div>';
-  } else {
-    syncBtn.textContent = 'Live Sync';
-    syncBtn.style.background = '';
-    syncBtn.style.borderColor = '';
+  const statusEl = document.getElementById('sync-status');
+  if(isSyncing && initialLoadDone){
+    syncBtn.textContent = 'Synced';
+    syncBtn.style.background = 'var(--success)';
+    syncBtn.style.borderColor = 'var(--success)';
+    syncBtn.style.cursor = 'default';
+    statusEl.innerHTML = '<div class="sync-bar"><span class="sync-dot"></span><span class="sync-label">Live synced</span></div>';
+  } else if(isSyncing){
+    syncBtn.textContent = 'Connecting...';
+    syncBtn.style.background = 'var(--text-muted)';
+    syncBtn.style.borderColor = 'var(--text-muted)';
     statusEl.innerHTML = '';
   }
 }
@@ -1956,13 +1826,8 @@ document.getElementById('tgt-prot').value = targets.prot;
 document.getElementById('tgt-carb').value = targets.carb;
 document.getElementById('tgt-fat').value = targets.fat;
 
-// Auto-reconnect sync if previously connected
-(function(){
-  const savedRoom = localStorage.getItem('mp-sync-room');
-  if(savedRoom && getFirebaseConfig()){
-    startSync(savedRoom);
-  }
-})();
+// Auto-connect to persistent Firebase database
+startSync();
 
 renderPlan();
 </script>
