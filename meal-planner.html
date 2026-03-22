@@ -96,6 +96,18 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
 .diff-pos{color:var(--success)}
 .diff-neg{color:var(--error)}
 
+/* Assign buttons */
+.assign-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);font-size:.65rem;font-weight:700;cursor:pointer;vertical-align:middle;margin-left:6px;transition:all .15s;line-height:1}
+.assign-btn:hover{transform:scale(1.1)}
+.assign-none{background:var(--white);color:var(--text-muted)}
+.assign-a{background:#e8f0fe;color:#1a73e8;border-color:#1a73e8}
+.assign-b{background:#fce8e6;color:#d93025;border-color:#d93025}
+
+/* Favorites */
+.fav-btn{background:none;border:none;cursor:pointer;font-size:1rem;padding:0 4px;transition:transform .15s;opacity:.3}
+.fav-btn:hover{transform:scale(1.2);opacity:.7}
+.fav-btn.is-fav{opacity:1}
+
 /* Steps */
 .steps-toggle{background:none;border:none;color:var(--gold);cursor:pointer;font-size:.78rem;font-weight:600;padding:2px 0;margin-top:3px;display:block;transition:color .15s}
 .steps-toggle:hover{color:var(--gold-light);text-decoration:underline}
@@ -158,6 +170,8 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
 .ing-qty{font-weight:700;color:var(--charcoal);margin-right:3px}
 .ing-from-wrap{width:100%;padding-left:24px;display:flex;flex-wrap:wrap;gap:4px}
 .ing-from-tag{font-size:.69rem;background:var(--bg);color:var(--text-muted);padding:1px 7px;border-radius:10px;font-weight:500;border:1px solid var(--border-light)}
+.ing-remove{background:none;border:none;color:#ccc;cursor:pointer;font-size:1.1rem;padding:2px 6px;border-radius:4px;transition:all .15s;flex-shrink:0}
+.ing-remove:hover{color:var(--error);background:rgba(160,64,64,.08)}
 .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
 .empty-state .icon{font-size:3rem;margin-bottom:10px}
 .add-ing-form{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
@@ -389,6 +403,7 @@ header .version{margin-left:auto;font-size:.7rem;text-transform:uppercase;letter
     <label>Days per week <input type="number" id="days-per-week" min="1" max="7" value="7" onchange="onSettingsChange()"></label>
     <label>People <input type="number" id="num-people" min="1" max="20" value="1" onchange="onSettingsChange()"></label>
     <button class="btn btn-secondary btn-sm" onclick="uncheckAll()">Uncheck All</button>
+    <button class="btn btn-gold btn-sm" onclick="newWeekReset()">New Week</button>
     <button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>
     <button class="btn btn-primary btn-sm" id="sync-btn" style="cursor:default">Connecting...</button>
   </div>
@@ -503,7 +518,7 @@ const MEAL_SLOTS = [
   {id:'dessert',   label:'Dessert',   cats:['Dessert','Snack']},
 ];
 
-const ALL_CATS = ['All','Breakfast','Lunch','Dinner','Snack','Dessert','Smoothie','Side','Sauce'];
+const ALL_CATS = ['All','Favorites','Breakfast','Lunch','Dinner','Snack','Dessert','Smoothie','Side','Sauce'];
 const SOURCE_FILTERS = ['All Sources','Vegan Proteins','The Vegan Gym','Web Recipes'];
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -511,6 +526,8 @@ let plan = JSON.parse(localStorage.getItem('mp-plan') || '{}');
 let checkedItems = JSON.parse(localStorage.getItem('mp-checked') || '{}');
 let customItems = JSON.parse(localStorage.getItem('mp-custom-items') || '[]');
 let targets = JSON.parse(localStorage.getItem('mp-targets') || '{"cal":1800,"prot":120,"carb":200,"fat":60}');
+let assignments = JSON.parse(localStorage.getItem('mp-assignments') || '{}');
+let favorites = JSON.parse(localStorage.getItem('mp-favorites') || '[]');
 let instructionsDB = {};
 let currentSlot = null;
 let activeFilter = 'All';
@@ -520,6 +537,8 @@ function savePlan(){ localStorage.setItem('mp-plan', JSON.stringify(plan)); push
 function saveChecked(){ localStorage.setItem('mp-checked', JSON.stringify(checkedItems)); }
 function saveCustomItems(){ localStorage.setItem('mp-custom-items', JSON.stringify(customItems)); }
 function saveTargets(){ localStorage.setItem('mp-targets', JSON.stringify(targets)); }
+function saveAssignments(){ localStorage.setItem('mp-assignments', JSON.stringify(assignments)); pushAssignmentsToSync(); }
+function saveFavorites(){ localStorage.setItem('mp-favorites', JSON.stringify(favorites)); pushFavoritesToSync(); }
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function fmt(v, dec=1){ return v != null ? (+v).toFixed(dec) : '–'; }
@@ -573,7 +592,10 @@ function renderPlan(){
     const showPrep = steps.length || hasIng;
 
     html += '<tr>';
-    html += '<td class="meal-label">'+slot.label+'</td>';
+    const assignee = assignments[slot.id] || '';
+    const assignClass = assignee === 'A' ? 'assign-a' : assignee === 'B' ? 'assign-b' : 'assign-none';
+    const assignLabel = assignee || '?';
+    html += '<td class="meal-label">'+slot.label+' <button class="assign-btn '+assignClass+'" onclick="event.stopPropagation();cycleAssign(\''+slot.id+'\')" title="Who\'s cooking?">'+assignLabel+'</button></td>';
     if(r){
       html += '<td data-label="Recipe"><div class="recipe-cell" onclick="openPanel(\''+slot.id+'\')">';
       html += '<span class="recipe-name">'+r.name+'</span>';
@@ -581,6 +603,8 @@ function renderPlan(){
       html += '<span class="tag '+_srcCls+'" style="font-size:.65rem;margin-left:4px">'+r.source+'</span>';
       if(pdfUrl) html += '<a class="pdf-link" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open recipe PDF">PDF</a>';
       if(steps.length) html += '<button class="cook-launch" onclick="event.stopPropagation();openCookMode(\''+fn+'\')" title="Cook mode">Cook</button>';
+      const isFav = favorites.includes(fn);
+      html += '<button class="fav-btn'+(isFav?' is-fav':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+fn+'\')" title="'+(isFav?'Remove from favorites':'Add to favorites')+'">'+(isFav?'\u2605':'\u2606')+'</button>';
       html += '<button class="remove-btn" onclick="event.stopPropagation();removeSlot(\''+slot.id+'\')" title="Remove">&times;</button>';
       html += '</div>';
       if(showPrep){
@@ -673,6 +697,24 @@ function removeSlot(slotId){
   renderPlan();
 }
 
+function cycleAssign(slotId){
+  const current = assignments[slotId] || '';
+  if(current === '') assignments[slotId] = 'A';
+  else if(current === 'A') assignments[slotId] = 'B';
+  else delete assignments[slotId];
+  saveAssignments();
+  renderPlan();
+}
+
+function toggleFavorite(fn){
+  const idx = favorites.indexOf(fn);
+  if(idx === -1) favorites.push(fn);
+  else favorites.splice(idx, 1);
+  saveFavorites();
+  renderPlan();
+  renderPanel();
+}
+
 function clearPlan(){
   plan = {};
   savePlan();
@@ -748,8 +790,16 @@ function renderPanel(){
     return true;
   });
 
-  // Sort: matching categories first, then alphabetical
+  // Filter by favorites if active
+  if(activeFilter === 'Favorites'){
+    filtered = filtered.filter(r => favorites.includes(r.fn));
+  }
+
+  // Sort: favorites first, then matching categories, then alphabetical
   filtered.sort((a,b) => {
+    const aFav = favorites.includes(a.fn) ? 0 : 1;
+    const bFav = favorites.includes(b.fn) ? 0 : 1;
+    if(aFav !== bFav) return aFav - bFav;
     const aMatch = a.cats.some(c => slot.cats.includes(c)) ? 0 : 1;
     const bMatch = b.cats.some(c => slot.cats.includes(c)) ? 0 : 1;
     if(aMatch !== bMatch) return aMatch - bMatch;
@@ -761,6 +811,8 @@ function renderPanel(){
     const pdfLink = pdfUrl ? '<a class="ri-pdf" href="'+pdfUrl+'" target="_blank" onclick="event.stopPropagation()" title="Open PDF">PDF</a>' : '';
     const hasCookSteps = (instructionsDB[r.fn] || []).length > 0;
     const cookLink = hasCookSteps ? '<button class="ri-cook" onclick="event.stopPropagation();openCookMode(\''+r.fn+'\')" title="Cook mode">Cook</button>' : '';
+    const isFav = favorites.includes(r.fn);
+    const favStar = '<button class="fav-btn'+(isFav?' is-fav':'')+'" onclick="event.stopPropagation();toggleFavorite(\''+r.fn+'\')" title="'+(isFav?'Unfavorite':'Favorite')+'">'+(isFav?'\u2605':'\u2606')+'</button>';
     return '<div class="recipe-item" onclick="pickRecipe(\''+r.fn+'\')">' +
       '<div class="recipe-item-info">' +
         '<div class="ri-name">'+r.name+'</div>' +
@@ -772,6 +824,7 @@ function renderPanel(){
           (r.sf ? '<span class="tag sf">SF</span>' : '') +
         '</div>' +
       '</div>' +
+      favStar +
       cookLink +
       pdfLink +
     '</div>';
@@ -1327,12 +1380,21 @@ function renderGrocery(){
 }
 
 function renderIngList(arr){
+  // Sort: unchecked first, checked to bottom
+  arr.sort((a, b) => {
+    const aChecked = checkedItems[a.key] ? 1 : 0;
+    const bChecked = checkedItems[b.key] ? 1 : 0;
+    if(aChecked !== bChecked) return aChecked - bChecked;
+    return a.entry.displayName.localeCompare(b.entry.displayName);
+  });
+
   let html = '<ul class="ing-list">';
   arr.forEach(({key, entry}) => {
     const isChecked = checkedItems[key] || false;
     const doneClass = isChecked ? ' ing-done' : '';
     const checkedAttr = isChecked ? ' checked' : '';
     const textClass = isChecked ? ' checked' : '';
+    const isCustom = key.startsWith('__custom__');
 
     let display = '';
     if(entry.hasQty && entry.totalQty > 0){
@@ -1346,6 +1408,7 @@ function renderIngList(arr){
     html += '<li class="'+doneClass+'">';
     html += '<input type="checkbox" class="ing-check" '+checkedAttr+' onchange="toggleCheck(\''+key.replace(/'/g,"\\'")+'\',this.checked)">';
     html += '<span class="ing-text'+textClass+'">'+display+'</span>';
+    if(isCustom) html += '<button class="ing-remove" onclick="removeCustomItem('+key.replace('__custom__','')+')" title="Remove">&times;</button>';
     // Recipe tags
     if(entry.recipes.length){
       html += '<div class="ing-from-wrap">';
@@ -1358,6 +1421,13 @@ function renderIngList(arr){
   });
   html += '</ul>';
   return html;
+}
+
+function removeCustomItem(index){
+  customItems.splice(index, 1);
+  saveCustomItems();
+  pushCustomToSync();
+  renderGrocery();
 }
 
 function toggleCheck(key, checked){
@@ -1373,6 +1443,18 @@ function uncheckAll(){
   saveChecked();
   pushCheckedToSync();
   renderGrocery();
+}
+
+function newWeekReset(){
+  if(!confirm('Start a new week? This will clear all checked items and custom additions.')) return;
+  checkedItems = {};
+  customItems = [];
+  saveChecked();
+  saveCustomItems();
+  pushCheckedToSync();
+  pushCustomToSync();
+  renderGrocery();
+  showToast('Fresh week! Grocery list reset.');
 }
 
 function toggleStoreBlock(header){
@@ -1391,6 +1473,7 @@ function addCustomItem(){
   if(!val) return;
   customItems.push(val);
   saveCustomItems();
+  pushCustomToSync();
   input.value = '';
   renderGrocery();
 }
@@ -1455,6 +1538,9 @@ let firebaseApp = null;
 let syncRef = null;
 let planRef = null;
 let settingsRef = null;
+let customRef = null;
+let assignRef = null;
+let favRef = null;
 let isSyncing = false;
 let syncPaused = false;
 let initialLoadDone = false;
@@ -1487,12 +1573,15 @@ function startSync(){
   syncRef = db.ref('shared/checked');
   planRef = db.ref('shared/plan');
   settingsRef = db.ref('shared/settings');
+  customRef = db.ref('shared/customItems');
+  assignRef = db.ref('shared/assignments');
+  favRef = db.ref('shared/favorites');
 
   initialLoadDone = false;
-  let loaded = { checked: false, plan: false, settings: false };
+  let loaded = { checked: false, plan: false, settings: false, custom: false, assign: false, fav: false };
 
   function checkInitDone(){
-    if(loaded.checked && loaded.plan && loaded.settings){
+    if(loaded.checked && loaded.plan && loaded.settings && loaded.custom){
       initialLoadDone = true;
       updateSyncUI();
     }
@@ -1582,6 +1671,72 @@ function startSync(){
     }
   });
 
+  // Listen for assignment changes
+  assignRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val();
+    if(!loaded.assign){
+      loaded.assign = true;
+      if(remote === null && Object.keys(assignments).length > 0){
+        assignRef.set(assignments);
+      } else if(remote){
+        assignments = remote;
+        localStorage.setItem('mp-assignments', JSON.stringify(assignments));
+      }
+      checkInitDone();
+      return;
+    }
+    syncPaused = true;
+    assignments = remote || {};
+    localStorage.setItem('mp-assignments', JSON.stringify(assignments));
+    renderPlan();
+    syncPaused = false;
+  });
+
+  // Listen for favorites changes
+  favRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val();
+    if(!loaded.fav){
+      loaded.fav = true;
+      if(remote === null && favorites.length > 0){
+        favRef.set(favorites);
+      } else if(remote){
+        favorites = remote;
+        localStorage.setItem('mp-favorites', JSON.stringify(favorites));
+      }
+      checkInitDone();
+      return;
+    }
+    syncPaused = true;
+    favorites = remote || [];
+    localStorage.setItem('mp-favorites', JSON.stringify(favorites));
+    renderPlan();
+    syncPaused = false;
+  });
+
+  // Listen for custom items changes
+  customRef.on('value', (snapshot) => {
+    if(syncPaused) return;
+    const remote = snapshot.val();
+    if(!loaded.custom){
+      loaded.custom = true;
+      if(remote === null && customItems.length > 0){
+        customRef.set(customItems);
+      } else if(remote){
+        customItems = remote;
+        localStorage.setItem('mp-custom-items', JSON.stringify(customItems));
+      }
+      checkInitDone();
+      return;
+    }
+    syncPaused = true;
+    customItems = remote || [];
+    localStorage.setItem('mp-custom-items', JSON.stringify(customItems));
+    renderGrocery();
+    syncPaused = false;
+  });
+
   isSyncing = true;
   updateSyncUI();
 }
@@ -1595,6 +1750,9 @@ function pushToSync(ref, data){
 function pushCheckedToSync(){ pushToSync(syncRef, checkedItems); }
 function pushPlanToSync(){ pushToSync(planRef, plan); }
 function pushSettingsToSync(){ pushToSync(settingsRef, getSettings()); }
+function pushCustomToSync(){ pushToSync(customRef, customItems); }
+function pushAssignmentsToSync(){ pushToSync(assignRef, assignments); }
+function pushFavoritesToSync(){ pushToSync(favRef, favorites); }
 
 function updateSyncUI(){
   const syncBtn = document.getElementById('sync-btn');
